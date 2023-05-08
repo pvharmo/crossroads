@@ -1,0 +1,26 @@
+[package]
+name = "crossroads"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.65"
+async-trait = "0.1.58"
+chrono = "0.4.23"
+directories = "4.0.1"
+downcast-trait = "0.1.0"
+eyre = "0.6.8"
+google-drive3 = "5.0.2"
+# google-drive3 = { git = "https://github.com/Byron/google-apis-rs" }
+oauth2 = "4.2.3"
+onedrive-api = "0.9.0"
+open = "3.0.3"
+regex = "1.6.0"
+reqwest = {version = "0.11.11", features = ["blocking"]}
+rust-s3 = {version = "0.32.3", default-features = false, features = ["sync"]}
+serde = "1.0.144"
+serde_json = "1.0.85"
+tokio = "1.21.2"
+trash = "3.0.0"
