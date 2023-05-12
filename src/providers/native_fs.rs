@@ -55,16 +55,17 @@ impl FileSystem for NativeFs {
         Ok(())
     }
 
-    async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<(), Box<dyn std::error::Error>> {
+    async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let new_path = std::path::Path::new(object_id.as_str()).parent().unwrap().join(new_name);
         fs::rename(self.root.clone() + object_id.as_str(), self.root.clone() + new_path.to_str().unwrap())?;
-        Ok(())
+        Ok(ObjectId::new(new_path.to_str().unwrap().to_string(), object_id.mime_type()))
     }
 
-    async fn move_to(&self, object_id: ObjectId, new_parent_id: ObjectId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn move_to(&self, object_id: ObjectId, new_parent_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let object_id_split: Vec<&str> = object_id.as_str().split("/").collect();
-        fs::rename(self.root.clone() + object_id.as_str(), self.root.clone() + new_parent_id.as_str() + "/" + object_id_split[object_id_split.len() - 1])?;
-        Ok(())
+        let new_path = self.root.clone() + new_parent_id.as_str() + "/" + object_id_split[object_id_split.len() - 1];
+        fs::rename(self.root.clone() + object_id.as_str(), new_path.clone())?;
+        Ok(ObjectId::new(new_path, object_id.mime_type()))
     }
 
     async fn create(&self, parent_id: ObjectId, file: File) -> Result<(), Box<dyn std::error::Error>> {

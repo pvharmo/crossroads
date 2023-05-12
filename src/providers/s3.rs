@@ -71,7 +71,7 @@ impl FileSystem for S3 {
         todo!()
     }
 
-    async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<(), Box<dyn std::error::Error>> {
+    async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let path = match object_id.to_string().strip_prefix("/") {
             Some(x) => x.to_string(),
             None => object_id.to_string()
@@ -94,14 +94,14 @@ impl FileSystem for S3 {
 
         bucket.set_path_style();
 
-        bucket.copy_object_internal(&path, new_path)?;
+        bucket.copy_object_internal(&path, new_path.clone())?;
         bucket.delete_object(path)?;
 
-        Ok(())
+        Ok(ObjectId::new(new_path, object_id.mime_type()))
     }
 
-    async fn move_to(&self, _object_id: ObjectId, _new_parent_id: ObjectId) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(())
+    async fn move_to(&self, _object_id: ObjectId, _new_parent_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
     }
 
     async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {

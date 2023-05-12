@@ -137,7 +137,7 @@ impl FileSystem for OneDrive {
         Ok(())
     }
 
-    async fn move_to(&self, object_id: ObjectId, new_parent_id: ObjectId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn move_to(&self, object_id: ObjectId, new_parent_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let drive = OneDriveApi::new(
             self.token.get().await.clone().unwrap().access_token().secret(), // Login token to Microsoft Graph.
             DriveLocation::me(),
@@ -151,7 +151,7 @@ impl FileSystem for OneDrive {
 
         let request_result = drive.move_(item_location, parent_location, None).await;
 
-        match request_result {
+        let item = match request_result {
             Ok(items) => Ok(items),
             Err(error) => {
                 if error.status_code() == Some(StatusCode::UNAUTHORIZED) {
@@ -167,10 +167,10 @@ impl FileSystem for OneDrive {
             }
         }?;
 
-        Ok(())
+        Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.mime_type()))
     }
 
-    async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<(), Box<dyn std::error::Error>> {
+    async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let drive = OneDriveApi::new(
             self.token.get().await.clone().unwrap().access_token().secret(), // Login token to Microsoft Graph.
             DriveLocation::me(),
@@ -203,8 +203,8 @@ impl FileSystem for OneDrive {
 
         let request_result = drive.update_item(item_location, &item).await;
 
-        match request_result {
-            Ok(items) => Ok(items),
+        let item: DriveItem = match request_result {
+            Ok(item) => Ok(item),
             Err(error) => {
                 if error.status_code() == Some(StatusCode::UNAUTHORIZED) {
                     self.refresh_token().await?;
@@ -219,7 +219,7 @@ impl FileSystem for OneDrive {
             }
         }?;
 
-        Ok(())
+        Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.mime_type()))
     }
 
     async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
