@@ -222,7 +222,7 @@ impl FileSystem for OneDrive {
         Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.mime_type()))
     }
 
-    async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
+    async fn read_directory(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
         let drive = OneDriveApi::new(
             self.token.get().await.clone().unwrap().access_token().secret(), // Login token to Microsoft Graph.
             DriveLocation::me(),
@@ -267,7 +267,7 @@ impl FileSystem for OneDrive {
 
         let filename = FileName::new(&file.name);
 
-        if file.mime_type == Some("directory".to_string()) {
+        if file.id.mime_type() == Some("directory".to_string()) {
             println!("Creating a directory");
             let items_result = drive.create_folder(item_location, filename.unwrap()).await;
     
@@ -348,10 +348,15 @@ impl FileSystem for OneDrive {
         }?;
 
         Ok(Metadata {
-            id: object_id,
-            name: item.name.unwrap(),
             mime_type: None,
-            open_path: item.web_url.unwrap()
+            open_path: Some(item.web_url.unwrap()),
+            modified_at: None,
+            created_at: None,
+            meta_changed_at: None,
+            accessed_at: None,
+            size: None,
+            owner: None,
+            permissions: None,
         })
     }
 }

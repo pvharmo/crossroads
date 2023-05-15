@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use onedrive_api::{ItemId, resource::DriveItem};
 
-use crate::interfaces::{filesystem::{ObjectId, File, FileSystem}, Provider};
+use crate::interfaces::{filesystem::{ObjectId, File, FileSystem, Metadata}, Provider};
 
 use self::token::TokenStorage;
 
@@ -37,10 +37,17 @@ impl From<DriveItem> for File {
         File {
             id: ObjectId::new(item.id.unwrap().as_str().to_string(), None),
             name: item.name.unwrap(),
-            mime_type: if item.folder.is_some() { Some("directory".to_string()) } else { None },
-            created_at: Some(chrono::DateTime::from_str(item.created_date_time.unwrap().as_str()).unwrap()),
-            modified_at: Some(chrono::DateTime::from_str(item.last_modified_date_time.unwrap().as_str()).unwrap()),
-            size: Some(item.size.unwrap().unsigned_abs())
+            metadata: Some(Metadata {
+                mime_type: if item.folder.is_some() { Some("directory".to_string()) } else { None },
+                created_at: Some(chrono::DateTime::from_str(item.created_date_time.unwrap().as_str()).unwrap()),
+                modified_at: Some(chrono::DateTime::from_str(item.last_modified_date_time.unwrap().as_str()).unwrap()),
+                meta_changed_at: None,
+                accessed_at: None,
+                size: Some(item.size.unwrap().unsigned_abs()),
+                open_path: None,
+                owner: None,
+                permissions: None,
+            })
         }
     }
 }

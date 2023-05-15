@@ -1,5 +1,5 @@
 use crate::interfaces::Provider;
-use crate::interfaces::filesystem::{FileSystem, File, ObjectId};
+use crate::interfaces::filesystem::{FileSystem, File, ObjectId, Metadata};
 use crate::providers::onedrive::OneDrive;
 use crate::providers::onedrive::token::OneDriveToken;
 use crate::providers::s3::S3Credentials;
@@ -84,7 +84,7 @@ impl ProvidersMap {
     pub async fn add_google_drive(&mut self, provider_id: ProviderId, tokens: HashMap<String, TokenInfo>) -> Result<(), ()> {
         dbg!(&tokens);
         let google_drive = GoogleDrive::new(self.keys.google_api_key.clone().unwrap().to_string(), tokens).await.unwrap();
-        google_drive.list_folder_content(ObjectId::directory("".to_string())).await.unwrap();
+        google_drive.read_directory(ObjectId::directory("".to_string())).await.unwrap();
 
         self.save(&provider_id, serde_json::to_value(&google_drive.tokens_map()).unwrap()).await;
         self.providers.insert(provider_id.clone(), Arc::new(google_drive));
@@ -134,10 +134,17 @@ impl ProvidersMap {
             let file: File = File {
                 id: ObjectId::plain_text(path.clone() + file_name.as_str()),
                 name: file_name.clone(),
-                mime_type: Some("text/plain".to_string()),
-                created_at: Some(chrono::Utc::now()),
-                modified_at: Some(chrono::Utc::now()),
-                size: None
+                metadata: Some(Metadata {
+                    mime_type: Some("text/plain".to_string()),
+                    created_at: Some(chrono::Utc::now()),
+                    modified_at: Some(chrono::Utc::now()),
+                    meta_changed_at: Some(chrono::Utc::now()),
+                    accessed_at: Some(chrono::Utc::now()),
+                    open_path: None,
+                    size: None,
+                    owner: None,
+                    permissions: None,
+                })
             };
     
             storage.create(ObjectId::plain_text(path.clone()), file.clone()).await.expect(format!("Unable to create provider {}", path.clone() + file_name.as_str()).as_str());
@@ -147,7 +154,6 @@ impl ProvidersMap {
     }
 
     pub async fn add_provider(&mut self, provider_id: ProviderId, provider_infos: serde_json::Value) -> Result<(), ()> {
-        println!("----");
         match provider_id.provider_type {
             ProviderType::NativeFs => {
                 let root: String = serde_json::from_value(provider_infos).unwrap();
@@ -171,8 +177,7 @@ impl ProvidersMap {
                 let credentials : S3Credentials = serde_json::from_value(provider_infos.get("credentials").unwrap().to_owned()).unwrap();
                 let bucket : String = serde_json::from_value(provider_infos.get("bucket").unwrap().to_owned()).unwrap();
                 self.add_s3(provider_id, bucket, credentials).await.unwrap();
-            },
-            _ => { return Err(()) }
+            }
         };
 
         Ok(())

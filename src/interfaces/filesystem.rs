@@ -50,18 +50,38 @@ impl ObjectId {
 pub struct File {
     pub id: ObjectId,
     pub name: String,
-    pub mime_type: Option<String>,
-    pub modified_at: Option<DateTime<Utc>>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub size: Option<u64>
+    pub metadata: Option<Metadata>,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub enum Permissions {
+    Unix(u32)
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub enum UserId {
+    UserAndGroup(u32, u32),
+    UniqueId(String),
+    NotApplicable
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct  User {
+    pub id: UserId,
+    pub name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Default)]
 pub struct Metadata {
-    pub id: ObjectId,
-    pub name: String,
     pub mime_type: Option<String>,
-    pub open_path: String
+    pub open_path: Option<String>,
+    pub modified_at: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub meta_changed_at: Option<DateTime<Utc>>,
+    pub accessed_at: Option<DateTime<Utc>>,
+    pub size: Option<u64>,
+    pub owner: Option<User>,
+    pub permissions: Option<Permissions>
 }
 
 #[async_trait]
@@ -71,7 +91,7 @@ pub trait FileSystem {
     async fn delete(&self, object_id: ObjectId) -> Result<(), Box<dyn std::error::Error>>;
     async fn move_to(&self, object_id: ObjectId, new_parent_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>>;
     async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<ObjectId, Box<dyn std::error::Error>>;
-    async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>>;
+    async fn read_directory(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>>;
     async fn create(&self, parent_id: ObjectId, file: File) -> Result<(), Box<dyn std::error::Error>>;
     async fn get_metadata(&self, object_id: ObjectId) -> Result<Metadata, Box<dyn std::error::Error>>;
 }

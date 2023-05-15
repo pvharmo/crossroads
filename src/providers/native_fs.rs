@@ -1,11 +1,13 @@
 use async_trait::async_trait;
-use chrono::{Utc, DateTime};
+use chrono::Utc;
 use eyre::Result;
-use std::{fs, path::Path};
+use std::fs;
 use serde::{Serialize, Deserialize};
 use trash;
-use std::fs::{File as NativeFile};
+use std::fs::File as NativeFile;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
+use crate::interfaces::filesystem::{User, UserId, Permissions};
 use crate::interfaces::{filesystem::{FileSystem, ObjectId, File, Metadata}, Provider, trash::Trash};
 
 
@@ -69,7 +71,7 @@ impl FileSystem for NativeFs {
     }
 
     async fn create(&self, parent_id: ObjectId, file: File) -> Result<(), Box<dyn std::error::Error>> {
-        if file.mime_type == Some("directory".to_string()) {
+        if file.metadata.unwrap().mime_type == Some("directory".to_string()) {
             fs::create_dir(self.root.clone() + parent_id.as_str() + "/" + file.name.as_str())?;
         } else {
             NativeFile::create(self.root.clone() + parent_id.as_str() + "/" + file.name.as_str())?;
@@ -77,7 +79,7 @@ impl FileSystem for NativeFs {
         Ok(())
     }
 
-    async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
+    async fn read_directory(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
         let dir_content = fs::read_dir(self.root.clone() + object_id.as_str())?;
 
         let mut files = vec![];
@@ -85,37 +87,72 @@ impl FileSystem for NativeFs {
         for file in dir_content {
             let entry = file.unwrap();
             let full_path = entry.path().as_os_str().to_str().unwrap().to_string();
-            let mime_type = if entry.metadata().unwrap().is_dir() {
-                Some("directory".to_string())
-            } else if entry.metadata().unwrap().is_symlink() {
-                Some("symlink".to_string())
-            } else {
-                Some("text/plain".to_string())
-            };
+            let mut mime_type = None;
+            let mut created_at = None;
+            let mut modified_at = None;
+            let mut owner = None;
+            let mut meta_changed_at = None;
+            let mut accessed_at = None;
+            let mut permissions = None;
+            if let Ok(metadata) = entry.metadata() {
+                mime_type = if metadata.is_dir() {
+                    Some("directory".to_string())
+                } else if metadata.is_symlink() {
+                    Some("symlink".to_string())
+                } else {
+                    Some("text/plain".to_string())
+                };
 
-            let created_at;
+                if let Ok(time) = metadata.created() {
+                    created_at = Some(chrono::DateTime::from(time));
+                } else {
+                    created_at = None;
+                }
+    
+                if let Ok(time) = metadata.modified() {
+                    modified_at = Some(chrono::DateTime::from(time));
+                } else {
+                    modified_at = None;
+                }
+    
+                owner = Some(User {
+                    #[cfg(target_family = "unix")]
+                    id: UserId::UserAndGroup(metadata.uid(), metadata.gid()),
+                    #[cfg(target_family = "windows")]
+                    id: UserId::NotApplicable,
+                    name: None,
+                });
+                
+                #[cfg(target_family = "unix")]
+                {
+                    permissions = Some(Permissions::Unix(metadata.permissions().mode()));
 
-            if let Ok(time) = entry.metadata().unwrap().created() {
-                created_at = Some(chrono::DateTime::from(time));
-            } else {
-                created_at = None;
-            }
+                    let ctime = chrono::NaiveDateTime::from_timestamp_opt(metadata.ctime(), 0);
+                    if let Some(ctime) = ctime {
+                        meta_changed_at = Some(chrono::DateTime::<Utc>::from_utc(ctime, Utc));
+                    }
 
-            let modified_at;
-
-            if let Ok(time) = entry.metadata().unwrap().modified() {
-                modified_at = Some(chrono::DateTime::from(time));
-            } else {
-                modified_at = None;
+                    let atime = chrono::NaiveDateTime::from_timestamp_opt(metadata.atime(), 0);
+                    if let Some(atime) = atime {
+                        accessed_at = Some(chrono::DateTime::<Utc>::from_utc(atime, Utc));
+                    }
+                }
             }
 
             files.push(File {
                 id: ObjectId::new(full_path.strip_prefix(&self.root.clone()).unwrap().to_string(), mime_type.clone()),
                 name: entry.file_name().to_string_lossy().to_string(),
-                mime_type,
-                created_at,
-                modified_at,
-                size: Some(entry.metadata().unwrap().len())
+                metadata: Some(Metadata {
+                    mime_type,
+                    created_at,
+                    modified_at,
+                    meta_changed_at,
+                    accessed_at,
+                    size: Some(entry.metadata().unwrap().len()),
+                    open_path: None,
+                    owner,
+                    permissions,
+                })
             });
         }
         Ok(files)
@@ -123,13 +160,70 @@ impl FileSystem for NativeFs {
 
     async fn get_metadata(&self, object_id: ObjectId) -> Result<crate::interfaces::filesystem::Metadata, Box<dyn std::error::Error>> {
         let metadata = std::fs::metadata(self.root.clone() + object_id.as_str()).unwrap();
-        let name = Path::new(object_id.as_str()).file_name().unwrap().to_str().unwrap().to_string();
-        let open_path = self.root.clone() + object_id.as_str();
+        let open_path = Some(self.root.clone() + object_id.as_str());
+
+        metadata.permissions().mode();
+
+        let created_at;
+        let modified_at;
+        let mut meta_changed_at = None;
+        let mut accessed_at = None;
+        let mut permissions = None;
+
+        let size = Some(metadata.len());
+        let mime_type = if metadata.is_dir() {
+            Some("directory".to_string())
+        } else if metadata.is_symlink() {
+            Some("symlink".to_string())
+        } else {
+            Some("text/plain".to_string())
+        };
+
+        if let Ok(time) = metadata.created() {
+            created_at = Some(chrono::DateTime::from(time));
+        } else {
+            created_at = None;
+        }
+
+        if let Ok(time) = metadata.modified() {
+            modified_at = Some(chrono::DateTime::from(time));
+        } else {
+            modified_at = None;
+        }
+
+        let owner = Some(User {
+            #[cfg(target_family = "unix")]
+            id: UserId::UserAndGroup(metadata.uid(), metadata.gid()),
+            #[cfg(target_family = "windows")]
+            id: UserId::NotApplicable,
+            name: None,
+        });
+        
+        #[cfg(target_family = "unix")]
+        {
+            permissions = Some(Permissions::Unix(metadata.permissions().mode()));
+
+            let ctime = chrono::NaiveDateTime::from_timestamp_opt(metadata.ctime(), 0);
+            if let Some(ctime) = ctime {
+                meta_changed_at = Some(chrono::DateTime::<Utc>::from_utc(ctime, Utc));
+            }
+
+            let atime = chrono::NaiveDateTime::from_timestamp_opt(metadata.atime(), 0);
+            if let Some(atime) = atime {
+                accessed_at = Some(chrono::DateTime::<Utc>::from_utc(atime, Utc));
+            }
+        }
+
         Ok(Metadata {
-            id: object_id,
-            name,
-            mime_type: if metadata.is_dir() { Some("directory".to_string()) } else { None },
-            open_path
+            modified_at,
+            created_at,
+            meta_changed_at,
+            accessed_at,
+            mime_type,
+            open_path,
+            size,
+            owner,
+            permissions,
         })
     }
 }
@@ -168,7 +262,7 @@ mod tests {
 
         let object_id = ObjectId::new(String::from(""), Some(String::from("directory")));
 
-        let result = x.list_folder_content(object_id).await;
+        let result = x.read_directory(object_id).await;
 
         assert!(result.is_ok());
 

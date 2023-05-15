@@ -19,10 +19,17 @@ impl From<google_drive3::api::File> for filesystem::File {
         File {
             id,
             name: file.name.unwrap(),
-            mime_type: file.mime_type,
-            created_at: file.created_time,
-            modified_at: file.modified_time,
-            size: Some(file.size.unwrap_or(0).unsigned_abs())
+            metadata: Some(Metadata {
+                mime_type: file.mime_type,
+                created_at: file.created_time,
+                modified_at: file.modified_time,
+                meta_changed_at: None,
+                accessed_at: None,
+                size: Some(file.size.unwrap_or(0).unsigned_abs()),
+                open_path: None,
+                owner: None,
+                permissions: None
+            })
         }
     }
 }
@@ -54,7 +61,7 @@ impl FileSystem for GoogleDrive {
         todo!()
     }
 
-    async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
+    async fn read_directory(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
         let id = if object_id.to_string() == "".to_string() {"root".to_string()} else {object_id.to_string()};
         let response = self.hub.files().list().q(format!("'{}' in parents", id).as_str()).doit().await?;
         

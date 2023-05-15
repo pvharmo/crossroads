@@ -5,7 +5,7 @@ use eyre::Result;
 use s3::{creds::Credentials, bucket::Bucket};
 use serde::{Serialize, Deserialize};
 
-use crate::interfaces::{filesystem::{FileSystem, ObjectId, File}, Provider};
+use crate::interfaces::{filesystem::{FileSystem, ObjectId, File, Metadata}, Provider};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -104,7 +104,7 @@ impl FileSystem for S3 {
         todo!()
     }
 
-    async fn list_folder_content(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
+    async fn read_directory(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
         let path = match object_id.to_string().strip_prefix("/") {
             Some(x) => x.to_string(),
             None => object_id.to_string()
@@ -144,10 +144,17 @@ impl FileSystem for S3 {
                         files.push(File {
                             id: ObjectId::new(path.to_string() + "/" + &name, None),
                             name: name.to_string(),
-                            mime_type: Some(mime_type.to_string()),
-                            created_at: None,
-                            modified_at: Some(chrono::DateTime::from_str(file.last_modified.as_str()).unwrap()),
-                            size: Some(file.size)
+                            metadata: Some(Metadata {
+                                mime_type: Some(mime_type.to_string()),
+                                created_at: None,
+                                modified_at: Some(chrono::DateTime::from_str(file.last_modified.as_str()).unwrap()),
+                                meta_changed_at: None,
+                                accessed_at: None,
+                                size: Some(file.size),
+                                open_path: None,
+                                owner: None,
+                                permissions: None,
+                            })
                         })
                     },
                     None => ()
@@ -199,7 +206,7 @@ mod tests {
             bucket: String::from("test")
         };
 
-        let result = x.list_folder_content(ObjectId::new(String::from("/"), Some(String::from("directory")))).await;
+        let result = x.read_directory(ObjectId::new(String::from("/"), Some(String::from("directory")))).await;
 
         assert!(result.is_ok());
 
@@ -221,7 +228,7 @@ mod tests {
             bucket: String::from("test")
         };
 
-        let result = x.list_folder_content(ObjectId::new(String::from("/level1/"), Some(String::from("directory")))).await;
+        let result = x.read_directory(ObjectId::new(String::from("/level1/"), Some(String::from("directory")))).await;
 
         assert!(result.is_ok());
 
