@@ -5,9 +5,16 @@ use serde::{Serialize, Deserialize};
 use chrono::prelude::{DateTime, Utc};
 
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum FileType {
+    Directory,
+    File,
+    Symlink
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
 pub struct ObjectId {
     path: String,
-    mime_type: Option<String>
+    file_type: FileType
 }
 
 impl fmt::Display for ObjectId {
@@ -17,32 +24,32 @@ impl fmt::Display for ObjectId {
 }
 
 impl ObjectId {
-    pub fn new(path: String, mime_type: Option<String>) -> Self {
-        ObjectId { path, mime_type }
+    pub fn new(path: String, file_type: FileType) -> Self {
+        ObjectId { path, file_type }
     }
 
     pub fn root() -> Self {
-        ObjectId { path: "".to_string(), mime_type: Some(String::from("directory")) }
+        ObjectId { path: "".to_string(), file_type: FileType::Directory }
     }
 
     pub fn directory(path: String) -> Self {
-        ObjectId { path, mime_type: Some(String::from("directory")) }
+        ObjectId { path, file_type: FileType::Directory }
     }
 
     pub fn plain_text(path: String) -> Self {
-        ObjectId { path, mime_type: Some(String::from("text/plain")) }
+        ObjectId { path, file_type: FileType::File }
     }
 
     pub fn as_str(&self) -> &str {
         self.path.as_str()
     }
 
-    pub fn mime_type(&self) -> Option<String> {
-        self.mime_type.clone()
+    pub fn file_type(&self) -> FileType {
+        self.file_type.clone()
     }
 
     pub fn is_directory(&self) -> bool {
-        self.mime_type == Some(String::from("directory"))
+        self.file_type == FileType::Directory
     }
 }
 

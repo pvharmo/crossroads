@@ -5,7 +5,7 @@ use eyre::Result;
 use s3::{creds::Credentials, bucket::Bucket};
 use serde::{Serialize, Deserialize};
 
-use crate::interfaces::{filesystem::{FileSystem, ObjectId, File, Metadata}, Provider};
+use crate::interfaces::{filesystem::{FileSystem, ObjectId, File, Metadata, FileType}, Provider};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,7 +97,7 @@ impl FileSystem for S3 {
         bucket.copy_object_internal(&path, new_path.clone())?;
         bucket.delete_object(path)?;
 
-        Ok(ObjectId::new(new_path, object_id.mime_type()))
+        Ok(ObjectId::new(new_path, object_id.file_type()))
     }
 
     async fn move_to(&self, _object_id: ObjectId, _new_parent_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
@@ -140,12 +140,12 @@ impl FileSystem for S3 {
                 let name_split = w.splitn(2, "/").next();
                 match name_split {
                     Some(name) => {
-                        let mime_type = if w.contains("/") {"directory"} else {"file"};
+                        let file_type = if w.ends_with("/") { FileType::Directory } else { FileType::File };
                         files.push(File {
-                            id: ObjectId::new(path.to_string() + "/" + &name, None),
+                            id: ObjectId::new(path.to_string() + "/" + &name, file_type),
                             name: name.to_string(),
                             metadata: Some(Metadata {
-                                mime_type: Some(mime_type.to_string()),
+                                mime_type: None,
                                 created_at: None,
                                 modified_at: Some(chrono::DateTime::from_str(file.last_modified.as_str()).unwrap()),
                                 meta_changed_at: None,
@@ -189,7 +189,7 @@ mod tests {
             },
             bucket: String::from("test")
         };
-        let result = x.read_file(ObjectId::new(String::from("hello-world.txt"), Some(String::from("text/plain")))).await;
+        let result = x.read_file(ObjectId::new(String::from("hello-world.txt"), FileType::File)).await;
         assert!(result.is_ok());
         assert_eq!(String::from_utf8(result.unwrap().to_vec()).unwrap(), String::from("hello world!"));
     }
@@ -206,7 +206,7 @@ mod tests {
             bucket: String::from("test")
         };
 
-        let result = x.read_directory(ObjectId::new(String::from("/"), Some(String::from("directory")))).await;
+        let result = x.read_directory(ObjectId::new(String::from("/"), FileType::Directory)).await;
 
         assert!(result.is_ok());
 
@@ -228,7 +228,7 @@ mod tests {
             bucket: String::from("test")
         };
 
-        let result = x.read_directory(ObjectId::new(String::from("/level1/"), Some(String::from("directory")))).await;
+        let result = x.read_directory(ObjectId::new(String::from("/level1/"), FileType::Directory)).await;
 
         assert!(result.is_ok());
 
@@ -250,13 +250,13 @@ mod tests {
             bucket: String::from("test")
         };
 
-        let original_id = ObjectId::new(String::from("/test.txt"), Some(String::from("text/plain")));
+        let original_id = ObjectId::new(String::from("/test.txt"), FileType::File);
 
         let result = x.rename(original_id, String::from("/test_renamed.txt")).await;
 
         assert!(result.is_ok());
 
-        let new_id = ObjectId::new(String::from("/test_renamed.txt"), Some(String::from("text/plain")));
+        let new_id = ObjectId::new(String::from("/test_renamed.txt"), FileType::File);
 
         let file = x.read_file(new_id.clone()).await;
 

@@ -7,7 +7,7 @@ use trash;
 use std::fs::File as NativeFile;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
-use crate::interfaces::filesystem::{User, UserId, Permissions};
+use crate::interfaces::filesystem::{User, UserId, Permissions, FileType};
 use crate::interfaces::{filesystem::{FileSystem, ObjectId, File, Metadata}, Provider, trash::Trash};
 
 
@@ -49,7 +49,7 @@ impl FileSystem for NativeFs {
     }
 
     async fn delete(&self, object_id: ObjectId) -> Result<(), Box<dyn std::error::Error>> {
-        if object_id.mime_type() == Some("directory".to_string()) {
+        if object_id.is_directory() {
             fs::remove_dir(self.root.clone() + object_id.as_str())?;
         } else {
             fs::remove_file(self.root.clone() + object_id.as_str())?;
@@ -60,14 +60,14 @@ impl FileSystem for NativeFs {
     async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let new_path = std::path::Path::new(object_id.as_str()).parent().unwrap().join(new_name);
         fs::rename(self.root.clone() + object_id.as_str(), self.root.clone() + new_path.to_str().unwrap())?;
-        Ok(ObjectId::new(new_path.to_str().unwrap().to_string(), object_id.mime_type()))
+        Ok(ObjectId::new(new_path.to_str().unwrap().to_string(), object_id.file_type()))
     }
 
     async fn move_to(&self, object_id: ObjectId, new_parent_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
         let object_id_split: Vec<&str> = object_id.as_str().split("/").collect();
         let new_path = self.root.clone() + new_parent_id.as_str() + "/" + object_id_split[object_id_split.len() - 1];
         fs::rename(self.root.clone() + object_id.as_str(), new_path.clone())?;
-        Ok(ObjectId::new(new_path, object_id.mime_type()))
+        Ok(ObjectId::new(new_path, object_id.file_type()))
     }
 
     async fn create(&self, parent_id: ObjectId, file: File) -> Result<(), Box<dyn std::error::Error>> {
@@ -87,7 +87,7 @@ impl FileSystem for NativeFs {
         for file in dir_content {
             let entry = file.unwrap();
             let full_path = entry.path().as_os_str().to_str().unwrap().to_string();
-            let mut mime_type = None;
+            let mut file_type = FileType::File;
             let mut created_at = None;
             let mut modified_at = None;
             let mut owner = None;
@@ -95,12 +95,12 @@ impl FileSystem for NativeFs {
             let mut accessed_at = None;
             let mut permissions = None;
             if let Ok(metadata) = entry.metadata() {
-                mime_type = if metadata.is_dir() {
-                    Some("directory".to_string())
+                file_type = if metadata.is_dir() {
+                    FileType::Directory
                 } else if metadata.is_symlink() {
-                    Some("symlink".to_string())
+                    FileType::Symlink
                 } else {
-                    Some("text/plain".to_string())
+                    FileType::File
                 };
 
                 if let Ok(time) = metadata.created() {
@@ -140,10 +140,10 @@ impl FileSystem for NativeFs {
             }
 
             files.push(File {
-                id: ObjectId::new(full_path.strip_prefix(&self.root.clone()).unwrap().to_string(), mime_type.clone()),
+                id: ObjectId::new(full_path.strip_prefix(&self.root.clone()).unwrap().to_string(), file_type.clone()),
                 name: entry.file_name().to_string_lossy().to_string(),
                 metadata: Some(Metadata {
-                    mime_type,
+                    mime_type: None,
                     created_at,
                     modified_at,
                     meta_changed_at,
@@ -250,7 +250,7 @@ mod tests {
         let x = NativeFs {
             root: "./sandbox/".to_string()
         };
-        let object_id = ObjectId::new(String::from("hello-world.txt"), Some(String::from("text/plain")));
+        let object_id = ObjectId::new(String::from("hello-world.txt"), FileType::File);
         let result = x.read_file(object_id).await;
         assert!(result.is_ok());
         assert_eq!(String::from_utf8(result.unwrap().to_vec()).unwrap(), String::from("hello world!"));
@@ -262,7 +262,7 @@ mod tests {
             root: "./sandbox/".to_string()
         };
 
-        let object_id = ObjectId::new(String::from(""), Some(String::from("directory")));
+        let object_id = ObjectId::new(String::from(""), FileType::Directory);
 
         let result = x.read_directory(object_id).await;
 

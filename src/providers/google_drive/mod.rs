@@ -37,7 +37,7 @@ mod tests {
     use serde_json::json;
     use super::drive3::oauth2;
 
-    use crate::interfaces::filesystem::{FileSystem, ObjectId};
+    use crate::interfaces::filesystem::{FileSystem, ObjectId, FileType};
 
     use super::GoogleDrive;
 
@@ -45,7 +45,7 @@ mod tests {
     async fn connect_and_list_files() {
         let secret = json!(oauth2::read_application_secret("./sandbox/client.json").await.unwrap()).to_string();
         let drive = GoogleDrive::new(secret, HashMap::new()).await.unwrap();
-        let object_id = ObjectId::new("root".to_string(), None);
+        let object_id = ObjectId::new("root".to_string(), FileType::Directory);
         let result = drive.read_directory(object_id).await.unwrap();
         dbg!(result);
     }

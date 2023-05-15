@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use onedrive_api::{ItemId, resource::DriveItem};
 
-use crate::interfaces::{filesystem::{ObjectId, File, FileSystem, Metadata}, Provider};
+use crate::interfaces::{filesystem::{ObjectId, File, FileSystem, Metadata, FileType}, Provider};
 
 use self::token::TokenStorage;
 
@@ -34,8 +34,16 @@ impl From<ObjectId> for ItemId {
 
 impl From<DriveItem> for File {
     fn from(item: DriveItem) -> Self {
+        let file_type = if item.file.is_some() {
+            FileType::File
+        } else if item.folder.is_some() {
+            FileType::Directory
+        } else {
+            FileType::Symlink
+        };
+
         File {
-            id: ObjectId::new(item.id.unwrap().as_str().to_string(), None),
+            id: ObjectId::new(item.id.unwrap().as_str().to_string(), file_type),
             name: item.name.unwrap(),
             metadata: Some(Metadata {
                 mime_type: if item.folder.is_some() { Some("directory".to_string()) } else { None },
@@ -54,7 +62,7 @@ impl From<DriveItem> for File {
 
 #[cfg(test)]
 mod tests {
-    use crate::{providers::onedrive::*, interfaces::filesystem::FileSystem};
+    use crate::{providers::onedrive::*, interfaces::filesystem::{FileSystem, FileType}};
 
     #[tokio::test]
     async fn one_drive_login_works() {
@@ -74,7 +82,7 @@ mod tests {
         
         onedrive.write_file(ObjectId::new(
             "5EE7F7AB27F9809D!120".to_string(),
-            Some("text/plain".to_string())),
+            FileType::File),
             "hello world lakjdlsa kjd ijda dlisajd qadioj qwoidj oaidjq oijdqoi djqwdj"
             .as_bytes().to_vec()).await.unwrap();
     }

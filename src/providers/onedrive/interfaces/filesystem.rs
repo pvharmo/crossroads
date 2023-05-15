@@ -167,7 +167,7 @@ impl FileSystem for OneDrive {
             }
         }?;
 
-        Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.mime_type()))
+        Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.file_type()))
     }
 
     async fn rename(&self, object_id: ObjectId, new_name: String) -> Result<ObjectId, Box<dyn std::error::Error>> {
@@ -219,7 +219,7 @@ impl FileSystem for OneDrive {
             }
         }?;
 
-        Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.mime_type()))
+        Ok(ObjectId::new(item.id.unwrap().as_str().to_string(), object_id.file_type()))
     }
 
     async fn read_directory(&self, object_id: ObjectId) -> Result<Vec<File>, Box<dyn std::error::Error>> {
@@ -267,7 +267,7 @@ impl FileSystem for OneDrive {
 
         let filename = FileName::new(&file.name);
 
-        if file.id.mime_type() == Some("directory".to_string()) {
+        if file.id.is_directory() {
             println!("Creating a directory");
             let items_result = drive.create_folder(item_location, filename.unwrap()).await;
     

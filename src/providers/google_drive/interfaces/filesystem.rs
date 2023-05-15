@@ -2,7 +2,7 @@ extern crate google_drive3 as drive3;
 use async_trait::async_trait;
 use drive3::api::File as GoogleDriveFile;
 
-use crate::interfaces::filesystem::{FileSystem, ObjectId, File, Metadata, self};
+use crate::interfaces::filesystem::{FileSystem, ObjectId, File, Metadata, FileType, self};
 
 use super::super::GoogleDrive;
 
@@ -14,7 +14,7 @@ impl From<google_drive3::api::File> for filesystem::File {
         if mime_type.clone().unwrap_or_default() == "application/vnd.google-apps.folder" {
             id = ObjectId::directory(file.id.unwrap());
         } else {
-            id = ObjectId::new(file.id.unwrap(), file.mime_type.clone());
+            id = ObjectId::new(file.id.unwrap(), FileType::File);
         }
         File {
             id,
