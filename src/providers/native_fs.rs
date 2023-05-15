@@ -198,11 +198,13 @@ impl FileSystem for NativeFs {
             id: UserId::NotApplicable,
             name: None,
         });
+
+        if cfg!(target_family = "unix") {
+            permissions = Some(Permissions::Unix(metadata.permissions().mode()));
+        }
         
         #[cfg(target_family = "unix")]
         {
-            permissions = Some(Permissions::Unix(metadata.permissions().mode()));
-
             let ctime = chrono::NaiveDateTime::from_timestamp_opt(metadata.ctime(), 0);
             if let Some(ctime) = ctime {
                 meta_changed_at = Some(chrono::DateTime::<Utc>::from_utc(ctime, Utc));
