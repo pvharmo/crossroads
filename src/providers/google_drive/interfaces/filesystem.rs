@@ -73,4 +73,12 @@ impl FileSystem for GoogleDrive {
     async fn get_metadata(&self, object_id: ObjectId) -> Result<Metadata, Box<dyn std::error::Error>> {
         todo!()
     }
+
+    async fn read_link(&self, object_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
+    }
+
+    async fn create_link(&self, parent_id: ObjectId, name: &str, link_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
+    }
 }

@@ -74,6 +74,10 @@ impl ProvidersMap {
         ProvidersMap {providers, keys}
     }
 
+    pub fn find_provider(&self, provider_name: &str) -> Option<ProviderId> {
+        self.providers.keys().find(|x| x.id == provider_name).cloned()
+    }
+
     pub fn get_provider(& self, provider: ProviderId) -> Result<Arc<dyn Provider>, String> {
         match self.providers.get(&provider) {
             Some(x) => Ok(x.clone()),

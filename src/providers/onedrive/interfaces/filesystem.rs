@@ -359,4 +359,12 @@ impl FileSystem for OneDrive {
             permissions: None,
         })
     }
+
+    async fn read_link(&self, object_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
+    }
+
+    async fn create_link(&self, parent_id: ObjectId, name: &str, link_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
+    }
 }

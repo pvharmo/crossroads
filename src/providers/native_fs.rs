@@ -5,7 +5,7 @@ use std::fs;
 use serde::{Serialize, Deserialize};
 use trash;
 use std::fs::File as NativeFile;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 
 use crate::interfaces::filesystem::{User, UserId, Permissions, FileType};
 use crate::interfaces::{filesystem::{FileSystem, ObjectId, File, Metadata}, Provider, trash::Trash};
@@ -171,13 +171,6 @@ impl FileSystem for NativeFs {
         let mut permissions = None;
 
         let size = Some(metadata.len());
-        let mime_type = if metadata.is_dir() {
-            Some("directory".to_string())
-        } else if metadata.is_symlink() {
-            Some("symlink".to_string())
-        } else {
-            Some("text/plain".to_string())
-        };
 
         if let Ok(time) = metadata.created() {
             created_at = Some(chrono::DateTime::from(time));
@@ -221,12 +214,23 @@ impl FileSystem for NativeFs {
             created_at,
             meta_changed_at,
             accessed_at,
-            mime_type,
+            mime_type: None,
             open_path,
             size,
             owner,
             permissions,
         })
+    }
+
+    async fn read_link(&self, object_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        let link = std::fs::read_link(self.root.clone() + object_id.as_str()).unwrap();
+        let symlink = ObjectId::new(link.to_str().unwrap().to_string(), FileType::Symlink);
+        Ok(symlink)
+    }
+
+    async fn create_link(&self, parent_id: ObjectId, name: &str, link_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        symlink(link_id.as_str(), self.root.clone() + parent_id.as_str() + "/" + name).unwrap();
+        Ok(ObjectId::new(parent_id.as_str().to_string() + "/" + name, FileType::Symlink))
     }
 }
 

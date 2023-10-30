@@ -171,6 +171,14 @@ impl FileSystem for S3 {
     async fn get_metadata(&self, _object_id: ObjectId) -> Result<crate::interfaces::filesystem::Metadata, Box<dyn std::error::Error>> {
         todo!()
     }
+
+    async fn read_link(&self, _object_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
+    }
+
+    async fn create_link(&self, parent_id: ObjectId, name: &str, link_id: ObjectId) -> Result<ObjectId, Box<dyn std::error::Error>> {
+        todo!()
+    }
 }
 
 #[cfg(test)]
